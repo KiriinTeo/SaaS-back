@@ -19,6 +19,7 @@ import { Input } from '@/components/ui/input';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Loader2, PlusCircle } from 'lucide-react';
+import { OpportunitiesFeed } from '@/components/opportunities-feed';
 
 type ActionState = {
   error?: string;
@@ -269,7 +270,7 @@ function InviteTeamMember() {
   );
 }
 
-export default function SettingsPage() {
+function SettingsPage() {
   return (
     <section className="flex-1 p-4 lg:p-8">
       <h1 className="text-lg lg:text-2xl font-medium mb-6">Team Settings</h1>
@@ -283,5 +284,20 @@ export default function SettingsPage() {
         <InviteTeamMember />
       </Suspense>
     </section>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <div className="p-6 max-w-7xl mx-auto space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-slate-100">Painel de Oportunidades</h1>
+        <p className="text-slate-400 text-sm">
+          Acompanhamento em tempo real de Pagamentos Antecipados e Super Odds.
+        </p>
+      </div>
+
+      <OpportunitiesFeed />
+    </div>
   );
 }
