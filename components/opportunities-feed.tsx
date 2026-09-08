@@ -1,12 +1,20 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { OddsPayload, getBookmakerInfo } from '@/lib/sports';
+import { playNotificationSound } from '@/lib/audio';
 
 export function OpportunitiesFeed() {
   const [odds, setOdds] = useState<OddsPayload[]>([]);
   const [filter, setFilter] = useState<'all' | 'early_payout' | 'super_odd'>('all');
   const [isConnected, setIsConnected] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+
+  // Ref para acessar o valor atualizado de isMuted dentro do callback da SSE
+  const isMutedRef = useRef(isMuted);
+  useEffect(() => {
+    isMutedRef.current = isMuted;
+  }, [isMuted]);
 
   useEffect(() => {
     let eventSource: EventSource | null = null;
@@ -14,63 +22,60 @@ export function OpportunitiesFeed() {
     let isUnmounted = false;
 
     const connect = () => {
-        if (isUnmounted) return;
+      if (isUnmounted) return;
+      if (eventSource) eventSource.close();
 
-        if (eventSource) {
-        eventSource.close();
-        }
+      eventSource = new EventSource('/api/stream');
 
-        eventSource = new EventSource('/api/stream');
-
-        eventSource.onopen = () => {
+      eventSource.onopen = () => {
         if (!isUnmounted) setIsConnected(true);
-        };
+      };
 
-        eventSource.onmessage = (event) => {
+      eventSource.onmessage = (event) => {
         try {
-            const newOdd: OddsPayload = JSON.parse(event.data);
-            setOdds((prevOdds) => {
+          const newOdd: OddsPayload = JSON.parse(event.data);
+
+          setOdds((prevOdds) => {
             const existingIndex = prevOdds.findIndex(
-                (item) => item.house === newOdd.house && item.match_id === newOdd.match_id
+              (item) => item.house === newOdd.house && item.match_id === newOdd.match_id
             );
 
+            // Se for uma oportunidade INÉDITA no feed, toca o alerta sonoro
+            if (existingIndex === -1 && !isMutedRef.current) {
+              playNotificationSound();
+            }
+
             if (existingIndex !== -1) {
-                const updated = [...prevOdds];
-                updated[existingIndex] = newOdd;
-                return updated;
+              const updated = [...prevOdds];
+              updated[existingIndex] = newOdd;
+              return updated;
             }
 
             return [newOdd, ...prevOdds];
-            });
+          });
         } catch (err) {
-            console.error('Erro ao ler pacote SSE:', err);
+          console.error('Erro ao ler pacote SSE:', err);
         }
-        };
+      };
 
-        eventSource.onerror = () => {
+      eventSource.onerror = () => {
         if (isUnmounted) return;
-        
         setIsConnected(false);
         eventSource?.close();
 
-        // Garante que não acumule múltiplos timeouts
         if (retryTimeout) clearTimeout(retryTimeout);
-
-        // Tenta reconectar continuamente a cada 3 segundos até o Next.js terminar de recompilar
-        retryTimeout = setTimeout(() => {
-            connect();
-        }, 3000);
-        };
+        retryTimeout = setTimeout(connect, 3000);
+      };
     };
 
     connect();
 
     return () => {
-        isUnmounted = true;
-        if (retryTimeout) clearTimeout(retryTimeout);
-        if (eventSource) eventSource.close();
+      isUnmounted = true;
+      if (retryTimeout) clearTimeout(retryTimeout);
+      if (eventSource) eventSource.close();
     };
-    }, []);
+  }, []);
 
   const filteredOdds = odds.filter((item) => {
     if (filter === 'early_payout') return item.has_early_payout;
@@ -80,24 +85,35 @@ export function OpportunitiesFeed() {
 
   return (
     <div className="space-y-6">
-      {/* Barra de Status e Filtros */}
+      {/* Barra de Status e Controles */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-900/80 p-4 rounded-xl border border-slate-800">
-        <div className="flex items-center gap-3">
-          <span className="relative flex h-3 w-3">
-            <span
-              className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
-                isConnected ? 'bg-emerald-400' : 'bg-red-400'
-              }`}
-            />
-            <span
-              className={`relative inline-flex rounded-full h-3 w-3 ${
-                isConnected ? 'bg-emerald-500' : 'bg-red-500'
-              }`}
-            />
-          </span>
-          <span className="text-sm font-medium text-slate-200">
-            {isConnected ? 'Stream Ao Vivo Ativo' : 'Conectando ao servidor...'}
-          </span>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2.5">
+            <span className="relative flex h-3 w-3">
+              <span
+                className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                  isConnected ? 'bg-emerald-400' : 'bg-red-400'
+                }`}
+              />
+              <span
+                className={`relative inline-flex rounded-full h-3 w-3 ${
+                  isConnected ? 'bg-emerald-500' : 'bg-red-500'
+                }`}
+              />
+            </span>
+            <span className="text-sm font-medium text-slate-200">
+              {isConnected ? 'Stream Ao Vivo Ativo' : 'Conectando ao servidor...'}
+            </span>
+          </div>
+
+          {/* Botão para Ativar/Desativar Som */}
+          <button
+            onClick={() => setIsMuted(!isMuted)}
+            className="text-xs px-2.5 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 transition flex items-center gap-1.5 border border-slate-700"
+            title={isMuted ? 'Ativar alertas sonoros' : 'Silenciar alertas sonoros'}
+          >
+            {isMuted ? 'Som Desativado' : 'Som Ativado'}
+          </button>
         </div>
 
         <div className="flex gap-2">
@@ -134,7 +150,7 @@ export function OpportunitiesFeed() {
         </div>
       </div>
 
-      {/* Grid de Oportunidades */}
+      {/* Grid de Cards */}
       {filteredOdds.length === 0 ? (
         <div className="p-12 text-center rounded-xl border border-dashed border-slate-800 bg-slate-900/40 text-slate-500">
           Aguardando novas oportunidades transmitidas pelo motor...
@@ -149,7 +165,6 @@ export function OpportunitiesFeed() {
                 key={`${item.house}-${item.match_id}-${idx}`}
                 className={`p-5 rounded-xl border bg-slate-900/90 hover:border-slate-700 transition space-y-4 shadow-lg ${bookmaker.borderColor}`}
               >
-                {/* Header do Card */}
                 <div className="flex justify-between items-center">
                   <span
                     className={`px-2.5 py-1 rounded-md text-xs font-bold uppercase tracking-wider ${bookmaker.badgeBg}`}
@@ -171,7 +186,6 @@ export function OpportunitiesFeed() {
                   </div>
                 </div>
 
-                {/* Confronto */}
                 <div>
                   <p className="text-xs text-slate-400 font-medium uppercase tracking-wide">
                     Partida
@@ -182,7 +196,6 @@ export function OpportunitiesFeed() {
                   </p>
                 </div>
 
-                {/* Seleção e Cotação */}
                 <div className="pt-2 border-t border-slate-800/80 flex justify-between items-center">
                   <div>
                     <span className="text-xs text-slate-400 block">Entrada</span>

@@ -3,31 +3,33 @@ import { getUser, getTeamForUser } from '@/lib/db/queries';
 import { redis, createRedisSubscriber } from '@/lib/redis';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 300; // Limite de 5 minutos mantendo o streaming ativo
 
 export async function GET(request: Request) {
-  // Validação de Autenticação via Sessão
+  // 1. Validação de Autenticação
   const user = await getUser();
   if (!user) {
     return new NextResponse('Não autorizado', { status: 401 });
   }
 
-  // Validação de Assinatura Stripe no Drizzle (Time/Usuário)
+  // 2. Validação Dinâmica de Assinatura Stripe
   const team = await getTeamForUser();
-  const isSubscribed = team?.stripeSubscriptionId && team?.planName !== 'Free';
+  const isSubscribed = Boolean(team?.stripeSubscriptionId && team?.planName !== 'Free');
+  const disableCheck = process.env.DISABLE_SUBSCRIPTION_CHECK === 'true';
 
-  // para testes: Comente a condição abaixo se quiser testar localmente sem criar assinatura no Stripe
-  //if (!isSubscribed) {
-  //  return new NextResponse('Assinatura ativa necessária', { status: 403 });
-  //}
+  // Se não estiver pago E a trava não estiver desativada via .env, bloqueia
+  if (!isSubscribed && !disableCheck) {
+    return new NextResponse('Assinatura ativa necessária', { status: 403 });
+  }
 
-  // Inicialização do Cliente Subscriber Dedicado
+  // 3. Inicialização do Cliente Subscriber
   const subscriber = createRedisSubscriber();
 
   const stream = new ReadableStream({
     async start(controller) {
       const encoder = new TextEncoder();
 
-      // 1- Snapshot Inicial: Envia odds já existentes no Redis ao conectar
+      // Snapshot Inicial
       try {
         const keys = await redis.keys('raw_odd:*');
         if (keys.length > 0) {
@@ -39,10 +41,10 @@ export async function GET(request: Request) {
           }
         }
       } catch (err) {
-        console.error('Erro ao carregar snapshot inicial do Redis:', err);
+        console.error('Erro no snapshot do Redis:', err);
       }
 
-      // 2- Escuta em Tempo Real do Canal Pub/Sub
+      // Escuta Pub/Sub em tempo real
       await subscriber.subscribe('odds_stream');
       subscriber.on('message', (channel, message) => {
         if (channel === 'odds_stream') {
@@ -50,7 +52,7 @@ export async function GET(request: Request) {
         }
       });
 
-      // 3- Limpeza de Conexão ao Fechar a Aba ou Desconectar
+      // Cleanup no Abort
       request.signal.addEventListener('abort', async () => {
         await subscriber.unsubscribe('odds_stream');
         await subscriber.quit();

@@ -6,20 +6,17 @@ const globalForRedis = globalThis as unknown as {
   redis: Redis | undefined;
 };
 
-// Cliente principal para leituras/buscas diretas de chaves (raw_odd:*)
-export const redis =
-  globalForRedis.redis ??
-  new Redis(redisUrl, {
-    maxRetriesPerRequest: 3,
-    enableReadyCheck: false,
-  });
+const redisOptions = {
+  maxRetriesPerRequest: 3,
+  enableReadyCheck: false,
+  // Habilita suporte a TLS em produção (rediss://)
+  tls: redisUrl.startsWith('rediss://') ? { rejectUnauthorized: false } : undefined,
+};
 
-// Função para instanciar clientes dedicados ao Pub/Sub (necessário para SSE)
+export const redis = globalForRedis.redis ?? new Redis(redisUrl, redisOptions);
+
 export function createRedisSubscriber(): Redis {
-  return new Redis(redisUrl, {
-    maxRetriesPerRequest: 3,
-    enableReadyCheck: false,
-  });
+  return new Redis(redisUrl, redisOptions);
 }
 
 if (process.env.NODE_ENV !== 'production') {
