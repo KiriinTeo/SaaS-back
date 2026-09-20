@@ -167,7 +167,7 @@ export function OpportunitiesFeed() {
               >
                 <div className="flex justify-between items-center">
                   <span
-                    className={`px-2.5 py-1 rounded-md text-xs font-bold uppercase tracking-wider ${bookmaker.badgeBg}`}
+                    className={`px-2.5 py-1 rounded-md text-xs font-bold uppercase tracking-wider ${bookmaker.logo ? 'flex items-center gap-2' : ''} ${bookmaker.badgeBg}`}
                   >
                     {bookmaker.name}
                   </span>
