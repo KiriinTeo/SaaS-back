@@ -4,6 +4,44 @@ import { useEffect, useState, useRef } from 'react';
 import { OddsPayload, getBookmakerInfo } from '@/lib/sports';
 import { playNotificationSound } from '@/lib/audio';
 
+function formatOdd(value: number | string | null | undefined) {
+  if (value === null || value === undefined || value === '') return 'N/A';
+
+  const numericValue = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(numericValue) ? numericValue.toFixed(2) : 'N/A';
+}
+
+function getOutcomeOdd(
+  item: OddsPayload,
+  outcome: 'home' | 'draw' | 'away'
+) {
+  if (outcome === 'home') {
+    return (
+      item.home_team_odd ??
+      item.home_odd ??
+      (item.selection?.toLowerCase() === item.home_team.toLowerCase()
+        ? item.odd
+        : undefined)
+    );
+  }
+
+  if (outcome === 'away') {
+    return (
+      item.away_team_odd ??
+      item.away_odd ??
+      (item.selection?.toLowerCase() === item.away_team.toLowerCase()
+        ? item.odd
+        : undefined)
+    );
+  }
+
+  return (
+    item.draw ??
+    item.draw_odd ??
+    (item.selection?.toLowerCase() === 'draw' ? item.odd : undefined)
+  );
+}
+
 export function OpportunitiesFeed() {
   const [odds, setOdds] = useState<OddsPayload[]>([]);
   const [filter, setFilter] = useState<'all' | 'early_payout' | 'super_odd'>('all');
@@ -37,7 +75,10 @@ export function OpportunitiesFeed() {
 
           setOdds((prevOdds) => {
             const existingIndex = prevOdds.findIndex(
-              (item) => item.house === newOdd.house && item.match_id === newOdd.match_id
+              (item) =>
+                (item.bookmaker || item.house) === (newOdd.bookmaker || newOdd.house) &&
+                item.match_id === newOdd.match_id &&
+                item.market_type === newOdd.market_type
             );
 
             // Se for uma oportunidade INÉDITA no feed, toca o alerta sonoro
@@ -158,11 +199,13 @@ export function OpportunitiesFeed() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredOdds.map((item, idx) => {
-            const bookmaker = getBookmakerInfo(item.house);
+            const bookmaker = getBookmakerInfo(item.bookmaker || item.house);
+            const matchLabel =
+              item.match || `${item.home_team} vs ${item.away_team}`;
 
             return (
               <div
-                key={`${item.house}-${item.match_id}-${idx}`}
+                key={`${item.bookmaker || item.house}-${item.match_id}-${item.market_type || 'default'}-${idx}`}
                 className={`p-5 rounded-xl border bg-slate-900/90 hover:border-slate-700 transition space-y-4 shadow-lg ${bookmaker.borderColor}`}
               >
                 <div className="flex justify-between items-center">
@@ -191,23 +234,43 @@ export function OpportunitiesFeed() {
                     Partida
                   </p>
                   <p className="text-base font-bold text-slate-100 mt-0.5">
-                    {item.home_team} <span className="text-slate-500 font-normal">vs</span>{' '}
-                    {item.away_team}
+                    {matchLabel}
                   </p>
                 </div>
 
                 <div className="pt-2 border-t border-slate-800/80 flex justify-between items-center">
                   <div>
-                    <span className="text-xs text-slate-400 block">Entrada</span>
+                    <span className="text-xs text-slate-400 block">Bookmaker</span>
                     <span className="text-sm font-semibold text-slate-200">
-                      {item.selection}
+                      {bookmaker.name}
                     </span>
                   </div>
 
                   <div className="text-right">
-                    <span className="text-xs text-slate-400 block">Odd</span>
-                    <span className="text-xl font-extrabold text-emerald-400">
-                      {item.odd.toFixed(2)}
+                    <span className="text-xs text-slate-400 block">Market</span>
+                    <span className="text-sm font-semibold text-slate-200">
+                      {item.market_type || 'N/A'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="rounded-lg bg-slate-800/70 p-2 text-center">
+                    <span className="text-[11px] text-slate-400 block">Home</span>
+                    <span className="text-lg font-extrabold text-emerald-400">
+                      {formatOdd(getOutcomeOdd(item, 'home'))}
+                    </span>
+                  </div>
+                  <div className="rounded-lg bg-slate-800/70 p-2 text-center">
+                    <span className="text-[11px] text-slate-400 block">Draw</span>
+                    <span className="text-lg font-extrabold text-emerald-400">
+                      {formatOdd(getOutcomeOdd(item, 'draw'))}
+                    </span>
+                  </div>
+                  <div className="rounded-lg bg-slate-800/70 p-2 text-center">
+                    <span className="text-[11px] text-slate-400 block">Away</span>
+                    <span className="text-lg font-extrabold text-emerald-400">
+                      {formatOdd(getOutcomeOdd(item, 'away'))}
                     </span>
                   </div>
                 </div>

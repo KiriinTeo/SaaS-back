@@ -3,8 +3,18 @@ export interface OddsPayload {
   match_id: string;
   home_team: string;
   away_team: string;
-  selection: string;
-  odd: number;
+  bookmaker?: string;
+  match?: string;
+  market_type?: string;
+  home_team_odd?: number | string | null;
+  away_team_odd?: number | string | null;
+  home_odd?: number | string | null;
+  away_odd?: number | string | null;
+  draw?: number | string | null;
+  draw_odd?: number | string | null;
+  // Legacy single-outcome fields kept for older engine messages.
+  selection?: string;
+  odd?: number | string | null;
   has_early_payout: boolean;
   is_super_odd: boolean;
   timestamp?: string;
@@ -88,4 +98,3 @@ export function getBookmakerInfo(slug: string): BookmakerConfig {
     }
   );
 }
-

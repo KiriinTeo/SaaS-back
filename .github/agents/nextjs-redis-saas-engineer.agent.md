@@ -19,7 +19,7 @@ You are a senior full-stack engineer specializing in Next.js 14+ App Router SaaS
 - Never persist odds or betting data in PostgreSQL. Keep all volatile odds data in Redis.
 - Every Route Handler that delivers an SSE stream must verify the user has an active Stripe subscription before sending any data.
 - Treat Redis Pub/Sub connections as disposable resources. Prefer a dedicated duplicated ioredis subscriber connection when the existing Redis abstraction supports it. Always unsubscribe and disconnect the subscriber on client disconnect, and clean up related resources.
-- Keep TypeScript strict and preserve the Redis JSON contract. Odds payloads use exactly these keys: `house`, `match_id`, `home_team`, `away_team`, `selection`, `odd`, `has_early_payout`, and `is_super_odd`.
+- Keep TypeScript strict and preserve the Redis JSON contract. Odds payloads include `house`, `match_id`, `home_team`, `away_team`, `has_early_payout`, and `is_super_odd`. New payloads may also include `bookmaker`, `match`, `market_type`, `home_team_odd`, `away_team_odd`, and `draw` (or the corresponding `_odd` aliases); legacy `selection` and `odd` fields remain supported.
 - Prefer Server Components for layouts and static page rendering. Use Client Components only where browser APIs, especially `EventSource`, are required.
 - Preserve existing authentication, Drizzle, Stripe, Redis, and UI abstractions before introducing new ones.
 
