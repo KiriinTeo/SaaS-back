@@ -5,6 +5,8 @@ export interface OddsPayload {
   away_team: string;
   bookmaker?: string;
   match?: string;
+  league?: string;
+  competition?: string;
   market_type?: string;
   home_team_odd?: number | string | null;
   away_team_odd?: number | string | null;
